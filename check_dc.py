@@ -1,6 +1,7 @@
 import networkx as nx
+from ldgplot import LDGPlot
 
-def check_dc_bucket_elimination(graph, full_conflict=True):
+def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
     '''
     Given a labeled distance graph, check its dynamic controllability.
     If full_conflict is True, extract the full conflict. Otherwise,
@@ -9,16 +10,24 @@ def check_dc_bucket_elimination(graph, full_conflict=True):
     + Boolean: FEASIBLE
     + Conflict: CONFLICT
     + Elimination order: ORDER
+    Side Effect: 
+    GRAPH is modified
     '''
 
     order = []
-    curr_graph = graph.copy()
+    curr_graph = graph
+
+    plot = None
+    if visualize:
+        plot = LDGPlot(curr_graph)
 
     # Main elimination loop
     v, nc = next_node(curr_graph)
     while v is not None:
         # print("Eliminating node: ", v)
-        feasible, nc = eliminate(curr_graph, v)
+        if visualize:
+            plot.plot()
+        feasible, nc = eliminate(curr_graph, v, plot=plot)
         if not feasible:
             if full_conflict:
                 return False, extract_conflict(nc), order
@@ -32,6 +41,7 @@ def check_dc_bucket_elimination(graph, full_conflict=True):
             return False, extract_conflict(nc), order
         else:
             return False, nc, order
+
     return True, None, order
 
 def next_node(curr_graph):
@@ -54,9 +64,9 @@ def track_ready_node(curr_graph, v, history, history_edges):
     if v in history:
         idx = history.index(v)
         return None, history_edges[idx:]
-    in_edges = curr_graph.in_edges(v, data=True)
+    in_edges = curr_graph.in_edges(v, data=True, keys=True)
     for e in in_edges:
-        source, _, data = e
+        source, _, key, data = e
         if data['weight'] < 0:
             history.append(v)
             history_edges.append(e)
@@ -74,7 +84,7 @@ def extract_conflict(nc):
     expanded_nc = expand_nc(nc)
     conflict = [expanded_nc]
     for e in expanded_nc:
-        _, _, data = e
+        _, _, _, data = e
         if data['labelType'] == 'lower':
             conflict.append(expand_extension_path(expanded_nc, e))
     return conflict
@@ -82,7 +92,7 @@ def extract_conflict(nc):
 def expand_nc(nc):
     expanded_nc = []
     for e in nc:
-        _, _, data = e
+        _, _, _, data = e
         if 'parents' in data:
             expanded_nc = expanded_nc + expand_nc(data['parents'])
         else:
@@ -90,7 +100,7 @@ def expand_nc(nc):
     return expanded_nc
 
 def expand_extension_path(nc, e):
-    _, _, data = e
+    _, _, _, data = e
     assert(data['labelType'] == 'lower')
     weight = data['weight']
     curr_weight = weight
@@ -98,7 +108,7 @@ def expand_extension_path(nc, e):
     path = [e]
     for i in range(len(nc)):
         curr_idx = (i+idx+1) % len(nc)
-        _, _, d = nc[curr_idx]
+        _, _, _, d = nc[curr_idx]
         w = d['weight']
         curr_weight += w
         path.append(nc[curr_idx])
@@ -106,7 +116,7 @@ def expand_extension_path(nc, e):
             return path
     raise ValueError
 
-def eliminate(curr_graph, v):
+def eliminate(curr_graph, v, plot=None):
     '''
     Given the current graph, eliminate v.
     Return:
@@ -116,35 +126,103 @@ def eliminate(curr_graph, v):
     v is eliminated from curr_graph is feasible.
     '''
 
-    # Join Project
-    tri_edges = []
-    for e_out in curr_graph.out_edges(v, data=True):
-        for e_in in curr_graph.in_edges(v, data=True):
-            source, _, _ = e_in
-            _, target, _ = e_out
+    ## Join Project
+
+    # Check consistency
+    for e_out in curr_graph.out_edges(v, data=True, keys=True):
+        for e_in in curr_graph.in_edges(v, data=True, keys=True):
+            source, _, key_in, _ = e_in
+            _, target, key_out, _ = e_out
             # Check consistency if forms a loop
             if source == target:
                 feasible = check_nc(e_in, e_out)
                 # print('check feasible: ', feasible)
+
+                #===================
+                # Visualization
+                #-------------------
+                if plot is not None:
+                    curr_graph.nodes[v]['color'] = 'r'
+                    curr_graph.edges[source, v, key_in]['color'] = 'b' if feasible else 'r'
+                    curr_graph.edges[source, v, key_in]['linewidth'] = 1 if feasible else 2
+                    curr_graph.edges[v, target, key_out]['color'] = 'b' if feasible else 'r'
+                    curr_graph.edges[v, target, key_out]['linewidth'] = 1 if feasible else 2
+                    plot.plot()
+                    del curr_graph.nodes[v]['color']
+                    del curr_graph.edges[source, v, key_in]['color']
+                    del curr_graph.edges[source, v, key_in]['linewidth']
+                    del curr_graph.edges[v, target, key_out]['color']
+                    del curr_graph.edges[v, target, key_out]['linewidth']
+                #====================
+
                 if not feasible:
                     return False, [e_in, e_out]
-            # Otherwise, triangulate edges
-            else:
-                new_edge = triangulate(e_in, e_out)
-                tri_edges.append(new_edge)
 
-    # filter tightest edges
-    for e in tri_edges:
-        source, target, data = e
-        existing_edges = curr_graph.get_edge_data(source, target)
-        if existing_edges == None:
-            existing_edges = {}
-        tightest, remove_edges = filter_tightest_edges(existing_edges, e)
-        if tightest:
-            # print("adding edge:", e)
-            curr_graph.add_edges_from([e])
-        # print("removing dominated edges:", remove_edges)
-        curr_graph.remove_edges_from(remove_edges)
+
+
+    # Triangulate
+    for e_out in curr_graph.out_edges(v, data=True, keys=True):
+        for e_in in curr_graph.in_edges(v, data=True, keys=True):
+            source, _, key_in, data_in = e_in
+            _, target, key_out, data_out = e_out
+            # Triangulate edges
+            if not source == target:
+                new_edge = triangulate(e_in, e_out)
+                # Filter tightest edges
+                source, target, data = new_edge
+                existing_edges = curr_graph.get_edge_data(source, target)
+                if existing_edges == None:
+                    existing_edges = {}
+                tightest, remove_edges, tighter_edge_idx = filter_tightest_edges(existing_edges, new_edge)
+
+                if plot is None:
+                    # Add to ldg if tightest
+                    if tightest:
+                        # print("adding edge:", e)
+                        curr_graph.add_edges_from([new_edge])
+                    # Remove any dominated edges
+                    # print("removing dominated edges:", remove_edges)
+                    curr_graph.remove_edges_from(remove_edges)
+
+                #===================
+                # Visualization
+                #-------------------
+                else:
+                    # Add to ldg, if not tightest, will remove next (this is easier for plotting)
+                    old_keys = set(existing_edges.keys())
+                    curr_graph.add_edges_from([new_edge])
+                    updated_keys = set(curr_graph.get_edge_data(source, target).keys())
+                    new_key = list(updated_keys.difference(old_keys))[0]
+
+                    curr_graph.nodes[v]['color'] = 'r'
+                    curr_graph.edges[source, target, new_key]['linestyle'] = '--'
+                    curr_graph.edges[source, target, new_key]['color'] = 'r'
+                    curr_graph.edges[source, v, key_in]['color'] = 'r'
+                    curr_graph.edges[v, target, key_out]['color'] = 'r'
+                    if tighter_edge_idx is not None:
+                        curr_graph.edges[source, target, tighter_edge_idx]['color'] = 'y'
+                    for e in remove_edges:
+                        s, t, k = e
+                        curr_graph.edges[s, t, k]['color'] = 'grey'
+                    plot.plot()
+                    del curr_graph.nodes[v]['color']
+                    del curr_graph.edges[source, target, new_key]['linestyle']
+                    del curr_graph.edges[source, target, new_key]['color']
+                    del curr_graph.edges[source, v, key_in]['color']
+                    del curr_graph.edges[v, target, key_out]['color']
+                    if tighter_edge_idx is not None:
+                        del curr_graph.edges[source, target, tighter_edge_idx]['color']
+                    for e in remove_edges:
+                        s, t, k = e
+                        del curr_graph.edges[s, t, k]['color']
+
+                    # Remove any dominated edges
+                    # print("removing dominated edges:", remove_edges)
+                    curr_graph.remove_edges_from(remove_edges)
+                    if not tightest:
+                        curr_graph.remove_edges_from([(source, target, new_key)])
+                #===================
+
     # Remove eliminated node and edges
     curr_graph.remove_node(v)
     return True, None
@@ -161,10 +239,10 @@ def filter_tightest_edges(existing_edges, e):
     for k in existing_edges:
         e_data = existing_edges[k]
         if tighter(e_data, data):
-            return False, remove_edges
+            return False, remove_edges, k
         if tighter(data, e_data):
             remove_edges.append((source, target, k))
-    return True, remove_edges
+    return True, remove_edges, None
 
 def tighter(e1, e2):
     if e1['weight'] <= e2['weight']:
@@ -178,8 +256,8 @@ def check_nc(e_in, e_out):
     '''
     Check if the cycle is negative, or has the same label.
     '''
-    _, _, e_in = e_in
-    _, _, e_out = e_out
+    _, _, _, e_in = e_in
+    _, _, _, e_out = e_out
     w_in = e_in['weight']
     w_out = e_out['weight']
     if w_in + w_out >= 0:
@@ -196,8 +274,8 @@ def triangulate(e_in, e_out):
     '''
     Given in edge and out edge, triangulate a child edge.
     '''
-    source, _, e_in_data = e_in
-    _, target, e_out_data = e_out
+    source, _, _, e_in_data = e_in
+    _, target, _, e_out_data = e_out
     label_type_in = e_in_data['labelType']
     label_type_out = e_out_data['labelType']
     label_in = e_in_data['label']
@@ -238,14 +316,5 @@ def triangulate(e_in, e_out):
         return (source, target, new_edge)
     else:
         return None
-
-
-
-
-
-
-
-
-
 
 

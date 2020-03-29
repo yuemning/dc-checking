@@ -2,6 +2,7 @@ import networkx as nx
 from uuid import uuid4
 from collections import defaultdict
 from check_dc import check_dc_bucket_elimination
+from ldgplot import LDGPlot
 
 def print_tc(name, s, e, lb, ub, contingent=False):
     if contingent:
@@ -175,7 +176,7 @@ class TemporalNetwork:
 
         return g
 
-    def is_controllable(self):
+    def is_controllable(self, visualize=False, visualize_conflict=False):
         '''
         Check the dynamic controllability of network.
         Return:
@@ -183,15 +184,36 @@ class TemporalNetwork:
         + Conflict: conflict
         '''
         ldg = self.to_ldg()
-        feasible, conflict, order = check_dc_bucket_elimination(ldg)
+        feasible, conflict, order = check_dc_bucket_elimination(ldg, visualize=visualize)
         if conflict is not None:
+
+            if visualize_conflict:
+                ldg_copy = self.to_ldg()
+                plot = LDGPlot(ldg_copy)
+                for c in conflict[0]:
+                    source, target, key, _ = c
+                    ldg_copy.edges[source, target, key]['color'] = 'r'
+                    ldg_copy.edges[source, target, key]['linewidth'] = 2
+                plot.plot()
+
             tn_conflict = []
             for c in conflict:
-                tn_c = [data['constraint'] for (source, target, data) in c if 'constraint' in data]
+                tn_c = [data['constraint'] for (source, target, key, data) in c if 'constraint' in data]
                 tn_conflict.append(tn_c)
             return feasible, tn_conflict
         else:
             return feasible, conflict
 
-
+if __name__ == '__main__':
+    # Controllable
+    # c1 = SimpleContingentTemporalConstraint('e1', 'e5', 15, 18.8554, 'c1')
+    # Uncontrollable
+    c1 = SimpleContingentTemporalConstraint('e1', 'e5', 0.6294, 18.8554, 'c1')
+    c2 = SimpleTemporalConstraint('e1', 'e2', 1, 100, 'c2')
+    c3 = SimpleTemporalConstraint('e2', 'e5', 0, 100, 'c3')
+    c4 = SimpleTemporalConstraint('e2', 'e3', 1, 100, 'c4')
+    c5 = SimpleTemporalConstraint('e3', 'e4', 1.5, 100, 'c5')
+    c6 = SimpleTemporalConstraint('e1', 'e4', 1, 3.5, 'c6')
+    network = TemporalNetwork([c1, c2, c3, c4, c5, c6])
+    feasible, conflict = network.is_controllable(visualize=True, visualize_conflict=True)
 
