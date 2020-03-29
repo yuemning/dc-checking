@@ -61,7 +61,7 @@ def test_tightest():
     network = TemporalNetwork([c1, c2, c3, c4])
     ldg = network.to_ldg()
     assert(len(ldg.edges()) == 6)
-    feasible, nc = eliminate(ldg, 'e2')
+    feasible, nc, _ = eliminate(ldg, 'e2')
     assert(len(ldg.edges()) == 2)
 
 def test_next_node():

@@ -16,24 +16,35 @@ def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
 
     order = []
     curr_graph = graph
+    eliminated_dict = {}
 
+    #===================
+    # Visualization
+    #-------------------
     plot = None
     if visualize:
         plot = LDGPlot(curr_graph)
+    #===================
+
 
     # Main elimination loop
     v, nc = next_node(curr_graph)
     while v is not None:
         # print("Eliminating node: ", v)
+        #===================
+        # Visualization
+        #-------------------
         if visualize:
             plot.plot()
-        feasible, nc = eliminate(curr_graph, v, plot=plot)
+        #===================
+        feasible, nc, eliminated_edges = eliminate(curr_graph, v, plot=plot)
         if not feasible:
             if full_conflict:
                 return False, extract_conflict(nc), order
             else:
                 return False, nc, order
         order.append(v)
+        eliminated_dict[v] = eliminated_edges
         v, nc = next_node(curr_graph)
 
     if nc is not None:
@@ -41,6 +52,94 @@ def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
             return False, extract_conflict(nc), order
         else:
             return False, nc, order
+
+    # Reverse pass: compile into dispatchable network
+    order_cp = order.copy()
+    while order_cp:
+        v = order_cp.pop()
+        # Add the eliminated edges back
+        eliminated_edges = eliminated_dict[v]
+        curr_graph.add_node(v)
+        curr_graph.add_edges_from(eliminated_edges)
+
+        #===================
+        # Visualization
+        #-------------------
+        if visualize:
+            curr_graph.nodes[v]['color'] = 'r'
+            plot.plot()
+            del curr_graph.nodes[v]['color']
+        #===================
+
+        # in edges must all be >= 0
+        in_edges = curr_graph.in_edges(v, data=True, keys=True)
+        # Any out edges >= 0 must find all extensions until < 0
+        out_edges = curr_graph.out_edges(v, data=True, keys=True)
+        out_pos_edges = []
+        for e in out_edges:
+            _, _, _, data = e
+            if data['weight'] >= 0:
+                out_pos_edges.append(e)
+
+        while out_pos_edges:
+            e1 = out_pos_edges.pop()
+            _, t1, k1, data1 = e1
+
+            #===================
+            # Visualization
+            #-------------------
+            if visualize:
+                curr_graph.nodes[v]['color'] = 'r'
+                curr_graph.edges[v, t1, k1]['color'] = 'r'
+                plot.plot()
+                del curr_graph.nodes[v]['color']
+                del curr_graph.edges[v, t1, k1]['color']
+            #===================
+
+            t_out_edges = curr_graph.out_edges(t1, data=True, keys=True)
+            for e2 in t_out_edges:
+                _, t2, k2, data2 = e2
+                if data2['weight'] < 0:
+                    new_edge = triangulate(e1, e2)
+                    # print("Adding edge: ", new_edge)
+
+                    if visualize:
+                        #===================
+                        # Visualization
+                        #-------------------
+                        old_edges = curr_graph.get_edge_data(v, t2)
+                        if old_edges is None:
+                            old_keys = set()
+                        else:
+                            old_keys = set(old_edges.keys())
+                        curr_graph.add_edges_from([new_edge])
+                        updated_keys = set(curr_graph.get_edge_data(v, t2).keys())
+                        new_key = list(updated_keys.difference(old_keys))[0]
+
+                        curr_graph.nodes[v]['color'] = 'r'
+                        curr_graph.edges[v, t1, k1]['color'] = 'r'
+                        curr_graph.edges[t1, t2, k2]['color'] = 'r'
+                        curr_graph.edges[v, t2, new_key]['color'] = 'r'
+                        curr_graph.edges[v, t2, new_key]['linestyle'] = '--'
+                        plot.plot()
+                        del curr_graph.nodes[v]['color']
+                        del curr_graph.edges[v, t1, k1]['color']
+                        del curr_graph.edges[t1, t2, k2]['color']
+                        del curr_graph.edges[v, t2, new_key]['color']
+                        del curr_graph.edges[v, t2, new_key]['linestyle']
+                        #=====================
+                    else:
+                        curr_graph.add_edges_from([new_edge])
+
+                    _, _, data = new_edge
+                    if data['weight'] >= 0:
+                        out_pos_edges.append((v, t2, 'dummy', data))
+
+    #===================
+    # Visualization
+    #-------------------
+    if visualize:
+        plot.plot()
 
     return True, None, order
 
@@ -156,7 +255,7 @@ def eliminate(curr_graph, v, plot=None):
                 #====================
 
                 if not feasible:
-                    return False, [e_in, e_out]
+                    return False, [e_in, e_out], None
 
 
 
@@ -223,9 +322,12 @@ def eliminate(curr_graph, v, plot=None):
                         curr_graph.remove_edges_from([(source, target, new_key)])
                 #===================
 
+    # Get edges that will be eliminated
+    eliminated_edges = list(curr_graph.out_edges(v, data=True)) + list(curr_graph.in_edges(v, data=True))
     # Remove eliminated node and edges
     curr_graph.remove_node(v)
-    return True, None
+
+    return True, None, eliminated_edges
 
 def filter_tightest_edges(existing_edges, e):
     '''

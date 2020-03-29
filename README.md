@@ -57,3 +57,7 @@ Then, the algorithm triangulates parent edges:
 ## Dependencies
 
 Use `pip3 install -r requirements.txt` to install dependencies
+
+## Reverse Compilation
+
+We do a reverse pass to compile the network into a dispatchable one. This is a hypothesis. It has not been verified or tested yet. See changes in `check_dc.py`.

@@ -206,9 +206,9 @@ class TemporalNetwork:
 
 if __name__ == '__main__':
     # Controllable
-    # c1 = SimpleContingentTemporalConstraint('e1', 'e5', 15, 18.8554, 'c1')
+    c1 = SimpleContingentTemporalConstraint('e1', 'e5', 15, 18.8554, 'c1')
     # Uncontrollable
-    c1 = SimpleContingentTemporalConstraint('e1', 'e5', 0.6294, 18.8554, 'c1')
+    # c1 = SimpleContingentTemporalConstraint('e1', 'e5', 0.6294, 18.8554, 'c1')
     c2 = SimpleTemporalConstraint('e1', 'e2', 1, 100, 'c2')
     c3 = SimpleTemporalConstraint('e2', 'e5', 0, 100, 'c3')
     c4 = SimpleTemporalConstraint('e2', 'e3', 1, 100, 'c4')
