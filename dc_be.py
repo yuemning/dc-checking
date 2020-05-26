@@ -1,5 +1,80 @@
 import networkx as nx
 from ldgplot import LDGPlot
+from temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
+from dc_checker_abstract import DCChecker
+
+class DCCheckerBE(DCChecker):
+    '''
+    This implementation extends STN consistency checking algorithm using
+    bucket elimination to STNU DC checking.
+    This algorithm can be visualized.
+    '''
+
+    def __init__(self, tn):
+        self.tn = tn
+
+    def is_controllable(self, visualize=False, visualize_conflict=False):
+        '''
+        Check the dynamic controllability of network.
+        Return:
+        + Controllable: controllable or not
+        + Conflict: conflict when network is uncontrollable
+        '''
+        ldg = self.to_ldg()
+        feasible, conflict, order = check_dc_bucket_elimination(ldg, visualize=visualize)
+        if conflict is not None:
+
+            if visualize_conflict:
+                ldg_copy = self.to_ldg()
+                plot = LDGPlot(ldg_copy)
+                for c in conflict[0]:
+                    source, target, key, _ = c
+                    ldg_copy.edges[source, target, key]['color'] = 'r'
+                    ldg_copy.edges[source, target, key]['linewidth'] = 2
+                plot.plot()
+
+            tn_conflict = []
+            for c in conflict:
+                tn_c = [data['constraint'] for (source, target, key, data) in c if 'constraint' in data]
+                tn_conflict.append(tn_c)
+            return feasible, tn_conflict
+        else:
+            return feasible, conflict
+
+    def to_ldg(self):
+        '''
+        Convert the temporal network into a normalized 
+        labeled distance graph.
+        Return:
+        + Labeled distance graph: LDG
+        '''
+        g = nx.MultiDiGraph()
+
+        for c_id in self.tn.id2constraint:
+            c = self.tn.id2constraint[c_id]
+            if isinstance(c, SimpleTemporalConstraint):
+                if c.ub is not None:
+                    g.add_edges_from([(c.s, c.e, {'label': None, 'labelType': None, 'weight': c.ub, 'constraint': [c, 'UB+']})])
+                if c.lb is not None:
+                    g.add_edges_from([(c.e, c.s, {'label': None, 'labelType': None, 'weight': -c.lb, 'constraint': [c, 'LB-']})])
+            elif isinstance(c, SimpleContingentTemporalConstraint):
+                if c.lb > 0:
+                    g.add_edges_from([(c.s, c.e + "'", {'label': None, 'labelType': None, 'weight': c.lb, 'constraint': [c, 'LB+']}),
+                                      (c.e + "'", c.s, {'label': None, 'labelType': None, 'weight': -c.lb, 'constraint': [c, 'LB-']}),
+                                      (c.e + "'", c.e, {'label': c.e, 'labelType': 'lower', 'weight': 0}),
+                                      (c.e, c.e + "'", {'label': c.e, 'labelType': 'upper', 'weight': -(c.ub - c.lb), 'constraint': [c, 'UB-', 'LB+']})])
+                elif c.lb == 0:
+                    g.add_edges_from([(c.s, c.e, {'label': c.e, 'labelType': 'lower', 'weight': c.lb, 'constraint': [c, 'LB+']}),
+                                      (c.e, c.s, {'label': c.e, 'labelType': 'upper', 'weight': -c.ub, 'constraint': [c, 'UB-']})])
+                else:
+                    raise ValueError
+
+        return g
+
+    
+#######################################################################################
+## Implementation of bucket elimination algorithm given labeled distance graph (LDG) ##
+#######################################################################################
 
 def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
     '''
@@ -316,5 +391,3 @@ def triangulate(e_in, e_out):
         return (source, target, new_edge)
     else:
         return None
-
-

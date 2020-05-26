@@ -111,7 +111,7 @@ class LDGPlot():
 
 
 if __name__ == '__main__':
-    from check_dc import eliminate
+    from dc_be import eliminate
     G = nx.MultiDiGraph()
     G.add_nodes_from(['e1', 'e2', 'e3'])
     G.add_edges_from([('e1', 'e2', {'label': None, 'labelType': None, 'weight': 5}),
