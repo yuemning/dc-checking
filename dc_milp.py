@@ -29,11 +29,10 @@ class DCCheckerMILP(DCChecker):
 
     def preprocess_network(self, tn):
         '''
-        Given a network, preprocess it so that no contingent constraints
-        share the same source event, and no contingent constraint starts
-        from an uncontrollable event.
+        Given a network, preprocess it so that no contingent constraint
+        starts from an uncontrollable event.
         Returns a shallow copy of the network, with new constraints for
-        the modified part of the network
+        the modified part of the network.
         '''
         network = TemporalNetwork()
         constraints = tn.get_constraints()
@@ -42,7 +41,6 @@ class DCCheckerMILP(DCChecker):
             if isinstance(c, SimpleContingentTemporalConstraint):
                 uncontrollable_to_num_contingent[c.e] = 1
 
-        source_to_num_contingent = {}
         for c in constraints:
             if isinstance(c, SimpleContingentTemporalConstraint):
                 # c.s is an uncontrollable event
@@ -55,18 +53,7 @@ class DCCheckerMILP(DCChecker):
                     new_c = SimpleContingentTemporalConstraint(source_copy, c.e, c.lb, c.ub, c.name)
                     network.add_constraints([equality, new_c])
                 else:
-                    # c.s is an executable event
-                    if c.s in source_to_num_contingent:
-                        # source event already has another contingent link
-                        num_contingent = source_to_num_contingent[c.s]
-                        source_copy = c.s + str(num_contingent)
-                        source_to_num_contingent[c.s] = num_contingent + 1
-                        equality = SimpleTemporalConstraint(c.s, source_copy, 0, 0, 'equality({},{})'.format(c.s, source_copy))
-                        new_c = SimpleContingentTemporalConstraint(source_copy, c.e, c.lb, c.ub, c.name)
-                        network.add_constraints([equality, new_c])
-                    else:
-                        source_to_num_contingent[c.s] = 1
-                        network.add_constraint(c)
+                    network.add_constraint(c)
             else:
                 network.add_constraint(c)
         return network
@@ -155,6 +142,7 @@ class DCCheckerMILP(DCChecker):
 
         events = self.tn.get_events()
         constraints = self.tn.get_constraints()
+        contingent_constraints = [c for c in constraints if isinstance(c, SimpleContingentTemporalConstraint)]
 
         # Non-negative cycle constraint
         # uij + uji >= 0
@@ -213,7 +201,7 @@ class DCCheckerMILP(DCChecker):
         # uik - ujk <= wijk
         # min(lik, wijk) <= lij
         # wijk <= uij should hold according to Cui's, but missed by Casanova
-        # TODO: Why is the alpha beta formulation necessary in Cui's paper for (6)?
+        # if (vi, vj) is contingent, lij >= wijk, missed by both Cui and Casanova
         for (vi, vj, vk) in self.w:
             # When (vi, vk) is contingent and vj, vk unordered
             uij = self.u[(vi, vj)]
@@ -234,7 +222,7 @@ class DCCheckerMILP(DCChecker):
             # (lij >= lik and wijk >= lik) or (lij >= wijk and wijk <= lik)
             # Reason: If wijk >= lik, we need that ukj + uji (uji = -lij <= -wijk) + lik(should be uik, but ik is contingent) >= 0 based on shortest path,
             # then ukj >= -lik - uji >= -lik + wijk >= 0, meaning vj can happen after vk, 
-            # Should be fine without comparing wijk >=/<= lik, but (7) uses it in Peng's implementation
+            # Should be fine without comparing wijk >=/<= lik, but (7) uses it so we add it
             xijk = self.x[(vi, vj, vk)]
             # If x = 0, lij >= lik (uji <= uki) and -uki <= wijk
             m.addConstr(uji - xijk * self.MAX_NUMERIC_BOUND <= uki, 'waitcond0({},{},{})'.format(vi, vj, vk))
@@ -243,44 +231,45 @@ class DCCheckerMILP(DCChecker):
             m.addConstr(-uji + (1-xijk) * self.MAX_NUMERIC_BOUND >= wijk, 'waitcond1({},{},{})'.format(vi, vj, vk))
             m.addConstr(wijk - (1-xijk) * self.MAX_NUMERIC_BOUND <= -uki, 'waitcond1+({},{},{})'.format(vi, vj, vk))
 
-            # Note that in Wah and Xin's paper, there is also wijk = lij if (vi, vj) is contingent
+            # if (vi, vj) is contingent, lij >= wijk
+            # In Wah and Xin's paper, there is a constraint wijk = lij if (vi, vj) is contingent
             # We can preprocess the network to avoid contingent links sharing same source event,
             # by adding a copy of the source event and add equality constraint.
-            # Cui's paper may have assumed so.
-            
+            # Cui's paper may have assumed so, which is why this constraint is not added.
+            # We add this constraint to avoid extra preprocessing.
+            for c in contingent_constraints:
+                if vi == c.s and vj == c.e:
+                    # (vi, vj) is contingent! lij >= wijk (-uji >= wijk)
+                    m.addConstr(-uji >= wijk, 'waitcondcontingent({},{},{})'.format(vi, vj, vk))
+
         # (8) wait regression
         # wijk − umj <= wimk
-        for c in constraints:
-            if isinstance(c, SimpleContingentTemporalConstraint):
-                vi = c.s
-                vk = c.e
-                for vj in events:
-                    for vm in events:
-                        if not vj == vi and not vj == vk and not vm == vi and not vm == vk and not vm == vj:
-                            wijk = self.w[(vi, vj, vk)]
-                            wimk = self.w[(vi, vm, vk)]
-                            umj = self.u[(vm, vj)]
-                            m.addConstr(wijk - umj <= wimk, 'regression({},{},{},{})'.format(vi, vj, vk, vm))
+        for c in contingent_constraints:
+            vi = c.s
+            vk = c.e
+            for vj in events:
+                for vm in events:
+                    if not vj == vi and not vj == vk and not vm == vi and not vm == vk and not vm == vj:
+                        wijk = self.w[(vi, vj, vk)]
+                        wimk = self.w[(vi, vm, vk)]
+                        umj = self.u[(vm, vj)]
+                        m.addConstr(wijk - umj <= wimk, 'regression({},{},{},{})'.format(vi, vj, vk, vm))
 
         # (7) wait regression for contingent constraint
         # (wijk <= 0) or (wijk − lmj <= wimk)
-        # In Peng's implementation, and according to Cui's paper, can be strengthed to
+        # According to Cui's paper, can be strengthed to
         # (wijk >= lik) => (wijk − lmj <= wimk)
         # That is xijk = 0 => (wijk + ujm <= wimk)
-        # TODO: this should be correct, though unclear what this (wijk <= 0) condition really means
-        for c1 in constraints:
-            if isinstance(c1, SimpleContingentTemporalConstraint):
-                for c2 in constraints:
-                    if isinstance(c2, SimpleContingentTemporalConstraint):
-                        vi = c1.s
-                        vk = c1.e
-                        vm = c2.s
-                        vj = c2.e
-                        if not c1 == c2:
-                            # Note that we assume vm == vi is avoided by copying vi to vi' and add equality constraint
-                            assert(not vm == vi)
-                            wijk = self.w[(vi, vj, vk)]
-                            xijk = self.x[(vi, vj, vk)]
-                            wimk = self.w[(vi, vm, vk)]
-                            ujm = self.u[(vj, vm)]
-                            m.addConstr(wijk + ujm - xijk * self.MAX_NUMERIC_BOUND <= wimk, 'regression-contingent({},{},{},{})'.format(vi, vj, vk, vm))
+        for c1 in contingent_constraints:
+            for c2 in contingent_constraints:
+                vi = c1.s
+                vk = c1.e
+                vm = c2.s
+                vj = c2.e
+                if not c1 == c2 and not vm == vi:
+                    # If vm == vi, contingent links starts at same source event, no need to propagate further
+                    wijk = self.w[(vi, vj, vk)]
+                    xijk = self.x[(vi, vj, vk)]
+                    wimk = self.w[(vi, vm, vk)]
+                    ujm = self.u[(vj, vm)]
+                    m.addConstr(wijk + ujm - xijk * self.MAX_NUMERIC_BOUND <= wimk, 'regression-contingent({},{},{},{})'.format(vi, vj, vk, vm))

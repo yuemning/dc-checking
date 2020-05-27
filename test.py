@@ -479,6 +479,36 @@ def test_dc_11():
     feasible, _ = checker.is_controllable()
     assert(not feasible)
 
+    # A =======[0,10]=====> C
+    #  \A'==[0,8]=>B-[0,2]-/
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 0, 10, 'c1')
+    c2 = SimpleTemporalConstraint('e2', 'e3', 0, 2, 'c2')
+    c3 = SimpleContingentTemporalConstraint('e1c', 'e2', 0, 8, 'c3')
+    c4 = SimpleTemporalConstraint('e1', 'e1c', 0, 0, 'c4')
+    network = TemporalNetwork([c1, c2, c3, c4])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(not feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(not feasible)
+
+    # A =======[0,10]=====> C
+    #  \==[0,8]=>B
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 0, 10, 'c1')
+    c2 = SimpleContingentTemporalConstraint('e1', 'e2', 0, 8, 'c3')
+    network = TemporalNetwork([c1, c2])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(feasible)
+
     # A =======[0,10]=====> C ---[0,2]--> B
     c1 = SimpleContingentTemporalConstraint('e1', 'e3', 0, 10, 'c1')
     c2 = SimpleTemporalConstraint('e3', 'e2', 0, 2, 'c2')
@@ -506,9 +536,11 @@ def test_dc_11():
     assert(feasible)
 
     # A =======[2,10]=====> C ===[1,2]==> B
+    #                         \==[0,3]==> D
     c1 = SimpleContingentTemporalConstraint('e1', 'e3', 2, 10, 'c1')
     c2 = SimpleContingentTemporalConstraint('e3', 'e2', 1, 2, 'c2')
-    network = TemporalNetwork([c1, c2])
+    c3 = SimpleContingentTemporalConstraint('e3', 'e4', 0, 3, 'c3')
+    network = TemporalNetwork([c1, c2, c3])
 
     checker = DCCheckerBE(network)
     feasible, conflict = checker.is_controllable()
