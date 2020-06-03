@@ -66,10 +66,10 @@ Then, the algorithm triangulates parent edges:
 
 ```
 checker = DCCheckerMILP(network)
-controllable, _ = checker.is_controllable()
+controllable, _ = checker.is_controllable(outputIIS=False)
 ```
 
-MILP checker does not return a conflict. However, the infeasible set of constraints can be seen from the output file `infeasible.ilp`.
+MILP checker does not return a conflict. However, the infeasible set of constraints can be seen from the output file `infeasible.ilp` by setting `outputIIS=True`.
 
 This implementation uses the MILP formulation from the following paper:
 
@@ -85,4 +85,5 @@ Cui, Jing, et al. "Optimising bounds in simple temporal networks with uncertaint
 * dc_milp: Implements the MILP checker.
 * ldgplot.py: Functions to plot the labeled distance graph.
 * test.py: Test cases for checking correctness.
+* evaluation.py: Evaluate performance using randomly generated examples.
 
