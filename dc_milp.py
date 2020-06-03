@@ -2,6 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 from temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
 from dc_checker_abstract import DCChecker
+# import timeit
 
 class DCCheckerMILP(DCChecker):
     '''
@@ -18,13 +19,13 @@ class DCCheckerMILP(DCChecker):
         self.orig_tn = tn
         self.MAX_NUMERIC_BOUND = 100000
 
-    def is_controllable(self):
+    def is_controllable(self, outputIIS=False):
         '''
         Return:
         + res: controllable or not
         + None: does not return conflict, see output file 'infeasible.ilp' for IIS.
         '''
-        res = self.solve_dc()
+        res = self.solve_dc(outputIIS=outputIIS)
         return res, None
 
     def preprocess_network(self, tn):
@@ -58,7 +59,7 @@ class DCCheckerMILP(DCChecker):
                 network.add_constraint(c)
         return network
 
-    def solve_dc(self):
+    def solve_dc(self, outputIIS=False):
 
         try:
 
@@ -66,6 +67,7 @@ class DCCheckerMILP(DCChecker):
 
             # Create a new model
             m = gp.Model("DCchecking")
+            m.setParam( 'OutputFlag', False)
 
             # Create variables
             self.add_variables_to_model(m)
@@ -75,18 +77,26 @@ class DCCheckerMILP(DCChecker):
             # e.g. m.setObjective(x + y + 2 * z, GRB.MAXIMIZE)
 
             # Add constraints
+            # start = timeit.default_timer()
             self.add_constraints_to_model(m)
+            # stop = timeit.default_timer()
+            # print('MILP encoding time: ', stop - start)
+
 
             # Optimize model
+            # start = timeit.default_timer()
             m.optimize()
+            # stop = timeit.default_timer()
+            # print('MILP solving time: ', stop - start)
 
             # Write the LP model
             # m.write('model.lp')
 
             if m.status == GRB.Status.INFEASIBLE:
                 # print('No feasible solution. See infeasible.ilp for conflict.')
-                m.computeIIS()
-                m.write("infeasible.ilp")
+                if outputIIS:
+                    m.computeIIS()
+                    m.write("infeasible.ilp")
                 return False
             else:
                 # print('Solution found.')
