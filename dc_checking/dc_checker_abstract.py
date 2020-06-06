@@ -6,6 +6,7 @@ class DCChecker(ABC):
     def __init__(self, tn):
         '''
         Takes a temporal network TN as input.
+        The temporal network TN cannot be modified by any side effect.
         '''
         pass
 

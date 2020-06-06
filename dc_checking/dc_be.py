@@ -1,7 +1,7 @@
 import networkx as nx
-from ldgplot import LDGPlot
-from temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
-from dc_checker_abstract import DCChecker
+from .ldgplot import LDGPlot
+from .temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
+from .dc_checker_abstract import DCChecker
 
 class DCCheckerBE(DCChecker):
     '''
@@ -58,16 +58,23 @@ class DCCheckerBE(DCChecker):
                 if c.lb is not None:
                     g.add_edges_from([(c.e, c.s, {'label': None, 'labelType': None, 'weight': -c.lb, 'constraint': [c, 'LB-']})])
             elif isinstance(c, SimpleContingentTemporalConstraint):
-                if c.lb > 0:
-                    g.add_edges_from([(c.s, c.e + "'", {'label': None, 'labelType': None, 'weight': c.lb, 'constraint': [c, 'LB+']}),
-                                      (c.e + "'", c.s, {'label': None, 'labelType': None, 'weight': -c.lb, 'constraint': [c, 'LB-']}),
-                                      (c.e + "'", c.e, {'label': c.e, 'labelType': 'lower', 'weight': 0}),
-                                      (c.e, c.e + "'", {'label': c.e, 'labelType': 'upper', 'weight': -(c.ub - c.lb), 'constraint': [c, 'UB-', 'LB+']})])
-                elif c.lb == 0:
-                    g.add_edges_from([(c.s, c.e, {'label': c.e, 'labelType': 'lower', 'weight': c.lb, 'constraint': [c, 'LB+']}),
-                                      (c.e, c.s, {'label': c.e, 'labelType': 'upper', 'weight': -c.ub, 'constraint': [c, 'UB-']})])
+                # In commonly accepted definition of STNU, for a contingent link, c.ub > c.lb.
+                # However, semantically, I think it makes sense to have contingent link with
+                # c.ub == c.lb, so we list it as a separate case and treat it as STC.
+                if c.lb == c.ub:
+                    g.add_edges_from([(c.s, c.e, {'label': None, 'labelType': None, 'weight': c.ub, 'constraint': [c, 'UB+']}),
+                                      (c.e, c.s, {'label': None, 'labelType': None, 'weight': -c.lb, 'constraint': [c, 'LB-']})])
                 else:
-                    raise ValueError
+                    if c.lb > 0:
+                        g.add_edges_from([(c.s, c.e + "'", {'label': None, 'labelType': None, 'weight': c.lb, 'constraint': [c, 'LB+']}),
+                                          (c.e + "'", c.s, {'label': None, 'labelType': None, 'weight': -c.lb, 'constraint': [c, 'LB-']}),
+                                          (c.e + "'", c.e, {'label': c.e, 'labelType': 'lower', 'weight': 0}),
+                                          (c.e, c.e + "'", {'label': c.e, 'labelType': 'upper', 'weight': -(c.ub - c.lb), 'constraint': [c, 'UB-', 'LB+']})])
+                    elif c.lb == 0:
+                        g.add_edges_from([(c.s, c.e, {'label': c.e, 'labelType': 'lower', 'weight': c.lb, 'constraint': [c, 'LB+']}),
+                                          (c.e, c.s, {'label': c.e, 'labelType': 'upper', 'weight': -c.ub, 'constraint': [c, 'UB-']})])
+                    else:
+                        raise ValueError
 
         return g
 

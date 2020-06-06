@@ -79,11 +79,12 @@ Cui, Jing, et al. "Optimising bounds in simple temporal networks with uncertaint
 ## File Directory
 
 * example.py: Basic examples.
-* temporal_network.py: Defines temporal network class.
-* dc_checker_abstract.py: Defines the DC checker abstract class.
-* dc_be: Implements the Bucket Elimination checker.
-* dc_milp: Implements the MILP checker.
-* ldgplot.py: Functions to plot the labeled distance graph.
 * test.py: Test cases for checking correctness.
 * evaluation.py: Evaluate performance using randomly generated examples.
+* dc_checking/
+	* temporal_network.py: Defines temporal network class.
+	* dc_checker_abstract.py: Defines the DC checker abstract class.
+	* dc_be: Implements the Bucket Elimination checker.
+	* dc_milp: Implements the MILP checker.
+	* ldgplot.py: Functions to plot the labeled distance graph.
 

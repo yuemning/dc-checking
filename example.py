@@ -1,6 +1,6 @@
-from temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
-from dc_milp import DCCheckerMILP
-from dc_be import DCCheckerBE
+from dc_checking.temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
+from dc_checking.dc_milp import DCCheckerMILP
+from dc_checking.dc_be import DCCheckerBE
 
 # Controllable
 # c1 = SimpleContingentTemporalConstraint('e1', 'e5', 15, 18.8554, 'c1')
@@ -20,5 +20,5 @@ print(controllable, conflict)
 
 # DC checker using MILP
 checker = DCCheckerMILP(network)
-controllable, _ = checker.is_controllable()
+controllable, _ = checker.is_controllable(outputIIS=False)
 print(controllable)

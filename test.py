@@ -1,7 +1,7 @@
 import networkx as nx
-from dc_be import check_dc_bucket_elimination, eliminate, DCCheckerBE
-from dc_milp import DCCheckerMILP
-from temporal_network import SimpleTemporalConstraint, SimpleContingentTemporalConstraint, TemporalNetwork
+from dc_checking.dc_be import check_dc_bucket_elimination, eliminate, DCCheckerBE
+from dc_checking.dc_milp import DCCheckerMILP
+from dc_checking.temporal_network import SimpleTemporalConstraint, SimpleContingentTemporalConstraint, TemporalNetwork
 
 def test_simple_bucket_elim():
     g = nx.MultiDiGraph()
@@ -550,6 +550,109 @@ def test_dc_11():
     feasible, _ = checker.is_controllable()
     assert(feasible)
 
+def test_dc_12():
+    """
+    Checker should be able to handle contingent links with lb == ub
+    """
+    # A =======[10,10]=====> C
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 10, 10, 'c1')
+    network = TemporalNetwork([c1])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(feasible)
+
+    # A =======[0,0]=====> C
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 0, 0, 'c1')
+    network = TemporalNetwork([c1])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(feasible)
+
+    # A =======[7,7]=====> C
+    #  \--[0,2]->B--[0,5]--/
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 7, 7, 'c1')
+    c2 = SimpleTemporalConstraint('e1', 'e2', 0, 2, 'c2')
+    c3 = SimpleTemporalConstraint('e2', 'e3', 0, 5, 'c3')
+    network = TemporalNetwork([c1, c2, c3])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(feasible)
+
+    # A =======[7,7]=====> C
+    #  \--[0,1]->B--[0,5]--/
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 7, 7, 'c1')
+    c2 = SimpleTemporalConstraint('e1', 'e2', 0, 1, 'c2')
+    c3 = SimpleTemporalConstraint('e2', 'e3', 0, 5, 'c3')
+    network = TemporalNetwork([c1, c2, c3])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(not feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(not feasible)
+
+    # A =======[7,7]=====> C
+    #  \--[2,2]->B--[5,5]--/
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 7, 7, 'c1')
+    c2 = SimpleTemporalConstraint('e1', 'e2', 2, 2, 'c2')
+    c3 = SimpleTemporalConstraint('e2', 'e3', 5, 5, 'c3')
+    network = TemporalNetwork([c1, c2, c3])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(feasible)
+
+    # A =======[7,7]=====> C
+    #  \==[2,2]=>B--[5,5]--/
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 7, 7, 'c1')
+    c2 = SimpleContingentTemporalConstraint('e1', 'e2', 2, 2, 'c2')
+    c3 = SimpleTemporalConstraint('e2', 'e3', 5, 5, 'c3')
+    network = TemporalNetwork([c1, c2, c3])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(feasible)
+
+    # A =======[7,7]=====> C
+    #  \==[2,3]=>B--[5,5]--/
+    c1 = SimpleContingentTemporalConstraint('e1', 'e3', 7, 7, 'c1')
+    c2 = SimpleContingentTemporalConstraint('e1', 'e2', 2, 3, 'c2')
+    c3 = SimpleTemporalConstraint('e2', 'e3', 5, 5, 'c3')
+    network = TemporalNetwork([c1, c2, c3])
+
+    checker = DCCheckerBE(network)
+    feasible, conflict = checker.is_controllable()
+    assert(not feasible)
+
+    checker = DCCheckerMILP(network)
+    feasible, _ = checker.is_controllable()
+    assert(not feasible)
+
 
 test_simple_bucket_elim()
 test_temporal_network()
@@ -569,4 +672,5 @@ test_dc_8()
 test_dc_9()
 test_dc_10()
 test_dc_11()
+test_dc_12()
 print("All tests passed.")

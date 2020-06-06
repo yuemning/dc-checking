@@ -1,7 +1,7 @@
 import gurobipy as gp
 from gurobipy import GRB
-from temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
-from dc_checker_abstract import DCChecker
+from .temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
+from .dc_checker_abstract import DCChecker
 # import timeit
 
 class DCCheckerMILP(DCChecker):
@@ -81,7 +81,6 @@ class DCCheckerMILP(DCChecker):
             self.add_constraints_to_model(m)
             # stop = timeit.default_timer()
             # print('MILP encoding time: ', stop - start)
-
 
             # Optimize model
             # start = timeit.default_timer()

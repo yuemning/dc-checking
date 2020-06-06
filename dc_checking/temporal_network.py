@@ -37,6 +37,9 @@ class SimpleTemporalConstraint(TemporalConstraint):
 class SimpleContingentTemporalConstraint(TemporalConstraint):
 
     def __init__(self, s, e, lb=None, ub=None, name=None):
+        """
+        We allow lb == ub
+        """
         super().__init__(s, e, lb, ub, name)
         assert(lb is not None)
         assert(ub is not None)

@@ -1,7 +1,7 @@
-from temporal_network import SimpleTemporalConstraint, SimpleContingentTemporalConstraint, TemporalNetwork
+from dc_checking.temporal_network import SimpleTemporalConstraint, SimpleContingentTemporalConstraint, TemporalNetwork
 from random import randint
-from dc_milp import DCCheckerMILP
-from dc_be import DCCheckerBE
+from dc_checking.dc_milp import DCCheckerMILP
+from dc_checking.dc_be import DCCheckerBE
 import timeit
 
 def generate_network(num_cont=5):
