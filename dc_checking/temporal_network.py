@@ -53,10 +53,12 @@ class SimpleContingentTemporalConstraint(TemporalConstraint):
 
 
 class TemporalNetwork:
-    def __init__(self, constraints=[]):
+    def __init__(self, constraints=None):
         '''
         Assume one contingent constraint for one uncontrollable event
         '''
+        if constraints is None:
+            constraints = []
         self.id2constraint = {}
         self.event2constraints = defaultdict(list)
         self.add_constraints(constraints)
