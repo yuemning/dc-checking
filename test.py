@@ -145,6 +145,23 @@ def test_conflict():
     assert(order.index('e5') < order.index('e6'))
 
 
+def test_milp_preprocess():
+    # A ===> B ====> C ---> D ====> E ----> F
+    c1 = SimpleContingentTemporalConstraint('e1', 'e2', 2, 5, 'c1')
+    c2 = SimpleContingentTemporalConstraint('e2', 'e3', 2, 5, 'c2')
+    c3 = SimpleTemporalConstraint('e3', 'e4', 2, 5, 'c3')
+    c4 = SimpleContingentTemporalConstraint('e4', 'e5', 2, 5, 'c4')
+    c5 = SimpleTemporalConstraint('e5', 'e6', 2, 5, 'c5')
+    network = TemporalNetwork([c1, c2, c3, c4, c5])
+
+    checker = DCCheckerMILP(network)
+    processed_network = checker.preprocess_network(network)
+    assert(len(processed_network.get_constraints()) == 6)
+    assert(len(network.get_constraints()) == 5)
+    feasible, _ = checker.is_controllable()
+    assert(feasible)
+
+
 def test_dc_0():
     c1 = SimpleTemporalConstraint('e1', 'e2', 2, 5, 'c1')
     c2 = SimpleContingentTemporalConstraint('e3', 'e2', 4, 7, 'c2')
@@ -660,6 +677,7 @@ test_tightest()
 test_next_node()
 test_next_node_nc()
 test_conflict()
+test_milp_preprocess()
 test_dc_0()
 test_dc_1()
 test_dc_2()

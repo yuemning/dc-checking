@@ -37,21 +37,27 @@ class DCCheckerMILP(DCChecker):
         '''
         network = TemporalNetwork()
         constraints = tn.get_constraints()
-        uncontrollable_to_num_contingent = {}
+        uncontrollable_events = {}
         for c in constraints:
             if isinstance(c, SimpleContingentTemporalConstraint):
-                uncontrollable_to_num_contingent[c.e] = 1
+                uncontrollable_events[c.e] = True
 
+        need_copy_events = {}
         for c in constraints:
             if isinstance(c, SimpleContingentTemporalConstraint):
                 # c.s is an uncontrollable event
-                if c.s in uncontrollable_to_num_contingent:
-                    # contingent link starts from an uncontrollable event
-                    num_contingent = uncontrollable_to_num_contingent[c.s]
-                    source_copy = c.s + str(num_contingent)
-                    uncontrollable_to_num_contingent[c.s] = num_contingent + 1
-                    equality = SimpleTemporalConstraint(c.s, source_copy, 0, 0, 'equality({},{})'.format(c.s, source_copy))
-                    new_c = SimpleContingentTemporalConstraint(source_copy, c.e, c.lb, c.ub, c.name)
+                if c.s in uncontrollable_events:
+                    # Contingent link starts from an uncontrollable event
+                    # Need copy of the uncontrollable event
+                    need_copy_events[c.s] = True
+
+        for c in constraints:
+            if isinstance(c, SimpleContingentTemporalConstraint):
+                if c.e in need_copy_events:
+                    # Create copy of the uncontrollable event
+                    u_event_copy = c.e + "-copy"
+                    equality = SimpleTemporalConstraint(u_event_copy, c.e, 0, 0, 'equality({},{})'.format(u_event_copy, c.e))
+                    new_c = SimpleContingentTemporalConstraint(c.s, u_event_copy, c.lb, c.ub, c.name)
                     network.add_constraints([equality, new_c])
                 else:
                     network.add_constraint(c)
