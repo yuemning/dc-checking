@@ -33,6 +33,16 @@ class TemporalConstraint:
                 'ub': self.ub,
                 'name': self.name}
 
+    @staticmethod
+    def from_json(data):
+        assert(data['type'] == 'temporal_constraint')
+        s = data['start']
+        e = data['end']
+        lb = data['lb']
+        ub = data['ub']
+        name = data['name']
+        return TemporalConstraint(s, e, lb, ub, name)
+
 
 class SimpleTemporalConstraint(TemporalConstraint):
     def __repr__(self):
@@ -45,6 +55,16 @@ class SimpleTemporalConstraint(TemporalConstraint):
         data = super().to_json()
         data['type'] = 'simple_temporal_constraint'
         return data
+
+    @staticmethod
+    def from_json(data):
+        assert(data['type'] == 'simple_temporal_constraint')
+        s = data['start']
+        e = data['end']
+        lb = data['lb']
+        ub = data['ub']
+        name = data['name']
+        return SimpleTemporalConstraint(s, e, lb, ub, name)
 
 class SimpleContingentTemporalConstraint(TemporalConstraint):
 
@@ -67,6 +87,16 @@ class SimpleContingentTemporalConstraint(TemporalConstraint):
         data = super().to_json()
         data['type'] = 'simple_contingent_temporal_constraint'
         return data
+
+    @staticmethod
+    def from_json(data):
+        assert(data['type'] == 'simple_contingent_temporal_constraint')
+        s = data['start']
+        e = data['end']
+        lb = data['lb']
+        ub = data['ub']
+        name = data['name']
+        return SimpleContingentTemporalConstraint(s, e, lb, ub, name)
 
 class TemporalNetwork:
     def __init__(self, constraints=None):
