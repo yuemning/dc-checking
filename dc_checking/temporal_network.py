@@ -25,6 +25,14 @@ class TemporalConstraint:
             name = str(uuid4())
         self.name = name
 
+    def to_json(self):
+        return {'type': 'temporal_constraint',
+                'start': self.s,
+                'end': self.e,
+                'lb': self.lb,
+                'ub': self.ub,
+                'name': self.name}
+
 
 class SimpleTemporalConstraint(TemporalConstraint):
     def __repr__(self):
@@ -33,6 +41,10 @@ class SimpleTemporalConstraint(TemporalConstraint):
     def __str__(self):
         return print_tc(self.name, self.s, self.e, self.lb, self.ub)
 
+    def to_json(self):
+        data = super().to_json()
+        data['type'] = 'simple_temporal_constraint'
+        return data
 
 class SimpleContingentTemporalConstraint(TemporalConstraint):
 
@@ -51,6 +63,10 @@ class SimpleContingentTemporalConstraint(TemporalConstraint):
     def __str__(self):
         return print_tc(self.name, self.s, self.e, self.lb, self.ub, contingent=True)
 
+    def to_json(self):
+        data = super().to_json()
+        data['type'] = 'simple_contingent_temporal_constraint'
+        return data
 
 class TemporalNetwork:
     def __init__(self, constraints=None):
