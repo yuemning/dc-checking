@@ -140,6 +140,15 @@ class TemporalNetwork:
     def get_events(self):
         return list(self.event2constraints.keys())
 
+    def get_constraint(self, name_or_constraint):
+        name = name_or_constraint
+        if isinstance(name_or_constraint, TemporalConstraint):
+            name = name_or_constraint.name
+        if name in self.id2constraint:
+            return self.id2constraint[name]
+        else:
+            return None
+
     def get_constraints(self):
         return list(self.id2constraint.values())
 
