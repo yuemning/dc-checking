@@ -24,6 +24,7 @@ class TemporalConstraint:
         if name == None:
             name = str(uuid4())
         self.name = name
+        self.annotation = {}
 
     def to_json(self):
         return {'type': 'temporal_constraint',
@@ -79,7 +80,7 @@ class SimpleContingentTemporalConstraint(TemporalConstraint):
 
     def __repr__(self):
         return print_tc(self.name, self.s, self.e, self.lb, self.ub, contingent=True)
-        
+
     def __str__(self):
         return print_tc(self.name, self.s, self.e, self.lb, self.ub, contingent=True)
 
@@ -111,7 +112,7 @@ class TemporalNetwork:
 
     def __repr__(self):
         return "<TN: {} constraints>".format(len(self.id2constraint))
-        
+
     def __str__(self):
         return "<TN: {} constraints>".format(len(self.id2constraint))
 
@@ -156,7 +157,7 @@ class TemporalNetwork:
         '''
         If remove_constraints is True, the constraints
         connected to e will also be removed.
-        If remove_single_events is True, remove the events 
+        If remove_single_events is True, remove the events
         if no constraints are still connected to it.
         '''
         if e in self.event2constraints:
@@ -181,7 +182,7 @@ class TemporalNetwork:
 
     def remove_constraint(self, c, remove_events=True):
         '''
-        If remove_events is True, remove the events if no 
+        If remove_events is True, remove the events if no
         constraints are still connected to it.
         '''
         if isinstance(c, TemporalConstraint):
@@ -205,4 +206,3 @@ class TemporalNetwork:
     def remove_constraints(self, c_list, remove_events=True):
         for c in c_list.copy():
             self.remove_constraint(c, remove_events)
-
