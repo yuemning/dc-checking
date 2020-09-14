@@ -3,6 +3,25 @@ from .ldgplot import LDGPlot
 from .temporal_network import TemporalNetwork, SimpleContingentTemporalConstraint, SimpleTemporalConstraint
 from .dc_checker_abstract import DCChecker
 
+
+def dg_to_stn(dg):
+    """Compile a distance graph into STN."""
+
+    stcs = []
+    edges = dg.edges(data=True)
+    for e in edges:
+        source, target, data = e
+        if 'label' in data and data['label'] is not None:
+            raise ValueError
+        if 'labelType' in data and data['labelType'] is not None:
+            raise ValueError
+        weight = data['weight']
+        stc = SimpleTemporalConstraint(source, target, ub=weight)
+        stcs.append(stc)
+
+    tn = TemporalNetwork(constraints=stcs)
+    return tn
+
 class DCCheckerBE(DCChecker):
     '''
     This implementation extends STN consistency checking algorithm using
@@ -12,6 +31,30 @@ class DCCheckerBE(DCChecker):
 
     def __init__(self, tn):
         self.tn = tn
+
+    def compile_out_nodes(self, nodes, visualize=False):
+        """Compile the nodes out of simple temporal network.
+
+        Returns:
+            bool: Successful compiltion or not.
+            stn: network after compilation
+        """
+
+        # The network must not contain any contingent links
+        for tc in self.tn.get_constraints():
+            if isinstance(tc, SimpleContingentTemporalConstraint):
+                raise ValueError
+        events = self.tn.get_events()
+        # The eliminated nodes must be network's events
+        for node in nodes:
+            if node not in events:
+                raise ValueError
+
+        ldg = self.to_ldg()
+        self.ldg = ldg
+        feasible, conflict, order = check_dc_bucket_elimination(ldg, visualize=visualize, eliminate_nodes=nodes)
+        compiled_stn = dg_to_stn(ldg)
+        return feasible, compiled_stn
 
     def is_controllable(self, visualize=False, visualize_conflict=False):
         '''
@@ -43,7 +86,7 @@ class DCCheckerBE(DCChecker):
 
     def to_ldg(self):
         '''
-        Convert the temporal network into a normalized 
+        Convert the temporal network into a normalized
         labeled distance graph.
         Return:
         + Labeled distance graph: LDG
@@ -78,12 +121,12 @@ class DCCheckerBE(DCChecker):
 
         return g
 
-    
+
 #######################################################################################
 ## Implementation of bucket elimination algorithm given labeled distance graph (LDG) ##
 #######################################################################################
 
-def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
+def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False, eliminate_nodes=None):
     '''
     Given a labeled distance graph, check its dynamic controllability.
     If full_conflict is True, extract the full conflict. Otherwise,
@@ -92,7 +135,7 @@ def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
     + Boolean: FEASIBLE
     + Conflict: CONFLICT
     + Elimination order: ORDER
-    Side Effect: 
+    Side Effect:
     GRAPH is modified
     '''
 
@@ -104,7 +147,14 @@ def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
         plot = LDGPlot(curr_graph)
 
     # Main elimination loop
-    v, nc = next_node(curr_graph)
+    if eliminate_nodes is None:
+        v, nc = next_node(curr_graph)
+    else:
+        to_eliminate = eliminate_nodes.copy()
+        v = None
+        nc = None
+        if to_eliminate:
+            v = to_eliminate.pop(0)
     while v is not None:
         # print("Eliminating node: ", v)
         if visualize:
@@ -116,7 +166,12 @@ def check_dc_bucket_elimination(graph, full_conflict=True, visualize=False):
             else:
                 return False, nc, order
         order.append(v)
-        v, nc = next_node(curr_graph)
+        if eliminate_nodes is None:
+            v, nc = next_node(curr_graph)
+        else:
+            v = None
+            if to_eliminate:
+                v = to_eliminate.pop(0)
 
     if nc is not None:
         if full_conflict:
@@ -243,8 +298,10 @@ def eliminate(curr_graph, v, plot=None):
 
 
     # Triangulate
-    for e_out in curr_graph.out_edges(v, data=True, keys=True):
-        for e_in in curr_graph.in_edges(v, data=True, keys=True):
+    out_edges = list(curr_graph.out_edges(v, data=True, keys=True)).copy()
+    in_edges = list(curr_graph.in_edges(v, data=True, keys=True)).copy()
+    for e_out in out_edges:
+        for e_in in in_edges:
             source, _, key_in, data_in = e_in
             _, target, key_out, data_out = e_out
             # Triangulate edges
