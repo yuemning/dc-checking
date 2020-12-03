@@ -292,7 +292,7 @@ def test_dc_4():
     feasible, _ = checker.is_controllable()
     assert(not feasible)
 
-    
+
     c1 = SimpleContingentTemporalConstraint('e1', 'e2', 0, 10, 'c1')
     c2 = SimpleTemporalConstraint('e3', 'e2', 0, 2, 'c2')
     c3 = SimpleContingentTemporalConstraint('e1c', 'e3', 0, 8, 'c3')
@@ -568,9 +568,8 @@ def test_dc_11():
     assert(feasible)
 
 def test_dc_12():
-    """
-    Checker should be able to handle contingent links with lb == ub
-    """
+    """Checker should be able to handle contingent links with lb == ub."""
+
     # A =======[10,10]=====> C
     c1 = SimpleContingentTemporalConstraint('e1', 'e3', 10, 10, 'c1')
     network = TemporalNetwork([c1])
@@ -670,6 +669,69 @@ def test_dc_12():
     feasible, _ = checker.is_controllable()
     assert(not feasible)
 
+def test_compile_nodes():
+    # A                      C
+    #  \--[-1,3]->B--[5,7]--/
+    c1 = SimpleTemporalConstraint('e1', 'e2', -1, 3, 'c1')
+    c2 = SimpleTemporalConstraint('e2', 'e3', 5, 7, 'c2')
+    network = TemporalNetwork([c1, c2])
+
+    checker = DCCheckerBE(network)
+    feasible, compiled_stn = checker.compile_out_nodes(['e2'], visualize=False)
+    assert(feasible)
+    assert(len(compiled_stn.get_constraints()) == 2)
+    for c in compiled_stn.get_constraints():
+        if c.s == 'e1' and c.e == 'e3':
+            assert(c.lb == None)
+            assert(c.ub == 10)
+        if c.s == 'e3' and c.e == 'e1':
+            assert(c.lb == None)
+            assert(c.ub == -4)
+
+    # A--------[0, 5]------->C
+    #  \--[-1,3]->B--[5,7]--/
+    c1 = SimpleTemporalConstraint('e1', 'e2', -1, 3, 'c1')
+    c2 = SimpleTemporalConstraint('e2', 'e3', 5, 7, 'c2')
+    c3 = SimpleTemporalConstraint('e1', 'e3', 0, 5, 'c3')
+    network = TemporalNetwork([c1, c2, c3])
+
+    checker = DCCheckerBE(network)
+    feasible, compiled_stn = checker.compile_out_nodes(['e2'], visualize=False)
+    assert(feasible)
+    assert(len(compiled_stn.get_constraints()) == 2)
+    for c in compiled_stn.get_constraints():
+        if c.s == 'e1' and c.e == 'e3':
+            assert(c.lb == None)
+            assert(c.ub == 5)
+        if c.s == 'e3' and c.e == 'e1':
+            assert(c.lb == None)
+            assert(c.ub == -4)
+
+def test_json():
+    """Test json encoding and decoding."""
+
+    c1 = SimpleContingentTemporalConstraint('e1', 'e2', 3, 100000, 'c1')
+    c2 = SimpleTemporalConstraint('e2', 'e3', -1, None, 'c2')
+    network = TemporalNetwork([c1, c2], name='test_network')
+    json_data = network.to_json()
+    new_network = TemporalNetwork.from_json(json_data)
+    assert(not network == new_network)
+    assert(network.name == new_network.name)
+    constraints = [c.name for c in network.get_constraints()]
+    new_constraints = [c.name for c in new_network.get_constraints()]
+    assert(set(constraints) == set(new_constraints))
+
+    # No name is intialized
+    c1 = SimpleContingentTemporalConstraint('e1', 'e2', 3, 3)
+    c2 = SimpleTemporalConstraint('e2', 'e3', -1, None)
+    network = TemporalNetwork([c1, c2])
+    json_data = network.to_json()
+    new_network = TemporalNetwork.from_json(json_data)
+    assert(not network == new_network)
+    assert(network.name == new_network.name)
+    constraints = [c.name for c in network.get_constraints()]
+    new_constraints = [c.name for c in new_network.get_constraints()]
+    assert(set(constraints) == set(new_constraints))
 
 test_simple_bucket_elim()
 test_temporal_network()
@@ -691,4 +753,6 @@ test_dc_9()
 test_dc_10()
 test_dc_11()
 test_dc_12()
+test_compile_nodes()
+test_json()
 print("All tests passed.")

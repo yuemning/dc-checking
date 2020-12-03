@@ -6,11 +6,12 @@ def distance(pos1, pos2):
     return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
 
 class LDGPlot():
-    '''
-    Given a reference to labeled distance graph LDG,
-    plot the graph.
+    """Plotting tool for labeled distance graph.
+
+    Given a reference to labeled distance graph LDG, plot the graph.
     Assumes LDG is unmodified during initialization.
-    '''
+    """
+
     def __init__(self, g):
         self.ldg = g
 
@@ -34,13 +35,13 @@ class LDGPlot():
         # Parameters
         self.curve_ratio = 0.2
 
-
     def plot(self):
-        '''
-        Plot the current LDG.
+        """Plot the current LDG.
+
         Notice that a node can have attributes 'color'.
         And an edge can have attributes 'color', 'linewidth' and 'linestyle'.
-        '''
+        """
+
         pos = self.pos
 
         curr_nodes = set(self.ldg.nodes())
@@ -107,25 +108,3 @@ class LDGPlot():
         else:
             self.xmin, self.xmax, self.ymin, self.ymax = plt.axis('equal')
         plt.show()
-
-
-
-if __name__ == '__main__':
-    from dc_be import eliminate
-    G = nx.MultiDiGraph()
-    G.add_nodes_from(['e1', 'e2', 'e3'])
-    G.add_edges_from([('e1', 'e2', {'label': None, 'labelType': None, 'weight': 5}),
-                      ('e1', 'e3', {'label': 'e3', 'labelType': 'lower', 'weight': 0}),
-                      ('e1', 'e3', {'label': 'e3', 'labelType': None, 'weight': 10}),
-                      ('e1', 'e3', {'label': 'e3', 'labelType': None, 'weight': 11}),
-                      ('e1', 'e3', {'label': 'e3', 'labelType': None, 'weight': 12}),
-                      ('e3', 'e1', {'label': 'e3', 'labelType': 'upper', 'weight': -5}),
-                      ('e3', 'e1', {'label': 'e3', 'labelType': None, 'weight': 14})])
-
-    p = LDGPlot(G)
-    p.plot()
-
-    eliminate(G, 'e3')
-
-    p.plot()
-

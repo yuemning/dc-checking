@@ -10,13 +10,18 @@ def print_tc(name, s, e, lb, ub, contingent=False):
 
 
 class TemporalConstraint:
-    '''
-    s: from event
-    e: end event
-    lb: lower bound
-    ub: upper bound
-    '''
+    """Temporal Constraint base class."""
+
     def __init__(self, s, e, lb=None, ub=None, name=None):
+        """Initialize a temporal constraint.
+
+        Args:
+            s: From event
+            e: End event
+            lb: Lower bound
+            ub: Upper bound
+        """
+
         self.s = s
         self.e = e
         self.lb = lb
@@ -27,25 +32,27 @@ class TemporalConstraint:
         self.annotation = {}
 
     def to_json(self):
-        return {'type': 'temporal_constraint',
+        return {'type': 'TemporalConstraint',
                 'start': self.s,
                 'end': self.e,
                 'lb': self.lb,
                 'ub': self.ub,
                 'name': self.name}
 
-    @staticmethod
-    def from_json(data):
-        assert(data['type'] == 'temporal_constraint')
+    @classmethod
+    def from_json(cls, data):
+        assert(data['type'] == 'TemporalConstraint')
         s = data['start']
         e = data['end']
         lb = data['lb']
         ub = data['ub']
         name = data['name']
-        return TemporalConstraint(s, e, lb, ub, name)
+        return cls(s, e, lb, ub, name)
 
 
 class SimpleTemporalConstraint(TemporalConstraint):
+    """Simple Tempora Constraint class."""
+
     def __repr__(self):
         return print_tc(self.name, self.s, self.e, self.lb, self.ub)
 
@@ -54,29 +61,34 @@ class SimpleTemporalConstraint(TemporalConstraint):
 
     def to_json(self):
         data = super().to_json()
-        data['type'] = 'simple_temporal_constraint'
+        data['type'] = 'SimpleTemporalConstraint'
         return data
 
-    @staticmethod
-    def from_json(data):
-        assert(data['type'] == 'simple_temporal_constraint')
+    @classmethod
+    def from_json(cls, data):
+        assert(data['type'] == 'SimpleTemporalConstraint')
         s = data['start']
         e = data['end']
         lb = data['lb']
         ub = data['ub']
         name = data['name']
-        return SimpleTemporalConstraint(s, e, lb, ub, name)
+        return cls(s, e, lb, ub, name)
+
 
 class SimpleContingentTemporalConstraint(TemporalConstraint):
+    """Simple Contingent Temporal Constraint class.
+
+    Represents contingent constraint, that is, end event can only be observed
+    and not controlled.
+    """
 
     def __init__(self, s, e, lb=None, ub=None, name=None):
-        """
-        We allow lb == ub
-        """
         super().__init__(s, e, lb, ub, name)
         assert(lb is not None)
         assert(ub is not None)
         assert(lb >= 0)
+        # We allow the case where lv == ub.
+        #  assert(not lb == ub)
 
     def __repr__(self):
         return print_tc(self.name, self.s, self.e, self.lb, self.ub, contingent=True)
@@ -86,24 +98,30 @@ class SimpleContingentTemporalConstraint(TemporalConstraint):
 
     def to_json(self):
         data = super().to_json()
-        data['type'] = 'simple_contingent_temporal_constraint'
+        data['type'] = 'SimpleContingentTemporalConstraint'
         return data
 
-    @staticmethod
-    def from_json(data):
-        assert(data['type'] == 'simple_contingent_temporal_constraint')
+    @classmethod
+    def from_json(cls, data):
+        assert(data['type'] == 'SimpleContingentTemporalConstraint')
         s = data['start']
         e = data['end']
         lb = data['lb']
         ub = data['ub']
         name = data['name']
-        return SimpleContingentTemporalConstraint(s, e, lb, ub, name)
+        return cls(s, e, lb, ub, name)
+
 
 class TemporalNetwork:
-    def __init__(self, constraints=None):
-        '''
-        Assume one contingent constraint for one uncontrollable event
-        '''
+    """Temporal Network class.
+
+    Each uncontrollable event is associated with a contingent constraint.
+    """
+
+    def __init__(self, constraints=None, name=None):
+        if name is None:
+            name = str(uuid4())
+        self.name = name
         if constraints is None:
             constraints = []
         self.id2constraint = {}
@@ -120,7 +138,7 @@ class TemporalNetwork:
         name = c.name
         if name in self.id2constraint:
             print("ERROR: constraint {} already exists network.".format(c))
-            raise ValueError
+            raise Exception
         else:
             self.id2constraint[name] = c
             self.event2constraints[c.s].append(c)
@@ -154,12 +172,16 @@ class TemporalNetwork:
         return list(self.id2constraint.values())
 
     def remove_event(self, e, remove_constraints=True, remove_unconnected_events=True):
-        '''
-        If remove_constraints is True, the constraints
-        connected to e will also be removed.
-        If remove_single_events is True, remove the events
-        if no constraints are still connected to it.
-        '''
+        """Remove an event from network.
+
+        Args:
+            e: Event to be removed.
+            remove_constraints: Optional; If remove_constraints is True, the constraints
+                connected to e will also be removed.
+            remove_unconnected_events: Optional; If remove_unconnected_events is True,
+                remove any event with no constraints connected to it.
+        """
+
         if e in self.event2constraints:
             constraints = self.event2constraints[e]
             if constraints:
@@ -167,24 +189,28 @@ class TemporalNetwork:
                     self.remove_constraints(constraints, remove_unconnected_events)
                 else:
                     print("ERROR: Removing event {} while still connected to constraints.".format(e))
-                    raise ValueError
-            # Check again if exists, since might be removed during remove_constraints
+                    raise Exception
+
+            # Check again if exists, since might have been removed during remove_constraints
             if e in self.event2constraints:
                 del self.event2constraints[e]
         else:
             print("ERROR: Cannot remove event {}, as it does not exist in network.".format(e))
-            raise ValueError
+            raise Exception
 
     def remove_events(self, e_list, remove_constraints=True, remove_unconnected_events=True):
         for e in e_list.copy():
             self.remove_event(e, remove_constraints, remove_unconnected_events)
 
-
     def remove_constraint(self, c, remove_events=True):
-        '''
-        If remove_events is True, remove the events if no
-        constraints are still connected to it.
-        '''
+        """Remove a constraint from network.
+
+        Args:
+            c: Constraint to be removed.
+            remove_events: Optional; If remove_events is True, remove the events if no
+                constraints are still connected to it.
+        """
+
         if isinstance(c, TemporalConstraint):
             c = c.name
         if c in self.id2constraint:
@@ -201,8 +227,26 @@ class TemporalNetwork:
             del self.id2constraint[c]
         else:
             print("ERROR: Cannot remove constraint {}, as it does not exist in network.".format(c))
-            raise ValueError
+            raise Exception
 
     def remove_constraints(self, c_list, remove_events=True):
         for c in c_list.copy():
             self.remove_constraint(c, remove_events)
+
+    def to_json(self):
+        return {
+                'type': 'TemporalNetwork',
+                'name': self.name,
+                'constraints': [c.to_json() for c in self.get_constraints()]
+                }
+
+    @classmethod
+    def from_json(cls, data):
+        assert(data['type'] == 'TemporalNetwork')
+        name = data['name']
+        constraints_json = data['constraints']
+        constraints = []
+        for c_json in constraints_json:
+            c_cls = globals().get(c_json['type'])
+            constraints.append(c_cls.from_json(c_json))
+        return cls(constraints, name)

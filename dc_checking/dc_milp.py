@@ -5,36 +5,45 @@ from .dc_checker_abstract import DCChecker
 # import timeit
 
 class DCCheckerMILP(DCChecker):
-    '''
+    """DC Checker class using MILP encoding.
+
     This implementation uses the MILP formulation from the following paper:
 
     Optimising Bounds in Simple Temporal Networks with Uncertainty under
     Dynamic Controllability Constraints
-    Jing Cui, Peng Yu, Cheng Fang, Patrik Haslum, Brian C. Williams 
+    Jing Cui, Peng Yu, Cheng Fang, Patrik Haslum, Brian C. Williams
 
     It is also summarized in Casanova's paper in ECAI 2016.
-    '''
+    """
 
     def __init__(self, tn):
         self.orig_tn = tn
         self.MAX_NUMERIC_BOUND = 100000
 
     def is_controllable(self, outputIIS=False):
-        '''
-        Return:
-        + res: controllable or not
-        + None: does not return conflict, see output file 'infeasible.ilp' for IIS.
-        '''
+        """Check dynamic controllability.
+
+        Args:
+            outputIIS: Optional; Whether output IIS file 'infeasible.ilp'.
+
+        Returns:
+            res: controllable or not
+            None: does not return conflict, see output file for IIS.
+        """
+
         res = self.solve_dc(outputIIS=outputIIS)
         return res, None
 
     def preprocess_network(self, tn):
-        '''
+        """Preprocess network to handle MILP encoding.
+
         Given a network, preprocess it so that no contingent constraint
         starts from an uncontrollable event.
+
         Returns a shallow copy of the network, with new constraints for
         the modified part of the network.
-        '''
+        """
+
         network = TemporalNetwork()
         constraints = tn.get_constraints()
         uncontrollable_events = {}
@@ -151,7 +160,7 @@ class DCCheckerMILP(DCChecker):
                         self.x[(vi, vj, vk)] = xijk
                         bijk = m.addVar(vtype=GRB.BINARY, name="b({}, {}, {})".format(vi, vj, vk))
                         self.b[(vi, vj, vk)] = bijk
-                        
+
 
     def add_constraints_to_model(self, m):
 
@@ -195,7 +204,7 @@ class DCCheckerMILP(DCChecker):
                         uik = self.u[(vi, vk)]
                         m.addConstr(uik <= uij + ujk, 'shortestpath({},{},{})'.format(vi, vj, vk))
 
-        # (4) Precede constraint 
+        # (4) Precede constraint
         # ljk > 0 => uij <= lik - ljk (uij <= -uki + ukj) and lij >= uik - ujk (-uji >= uik - ujk)
         for (vi, vj, vk) in self.b:
             # When (vi, vk) is contingent and ljk > 0 means vj precedes vk for sure
@@ -236,7 +245,7 @@ class DCCheckerMILP(DCChecker):
             # min(lik, wijk) <= lij
             # (lij >= lik and wijk >= lik) or (lij >= wijk and wijk <= lik)
             # Reason: If wijk >= lik, we need that ukj + uji (uji = -lij <= -wijk) + lik(should be uik, but ik is contingent) >= 0 based on shortest path,
-            # then ukj >= -lik - uji >= -lik + wijk >= 0, meaning vj can happen after vk, 
+            # then ukj >= -lik - uji >= -lik + wijk >= 0, meaning vj can happen after vk,
             # Should be fine without comparing wijk >=/<= lik, but (7) uses it so we add it
             xijk = self.x[(vi, vj, vk)]
             # If x = 0, lij >= lik (uji <= uki) and -uki <= wijk
